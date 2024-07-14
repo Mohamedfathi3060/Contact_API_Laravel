@@ -26,9 +26,13 @@ class ContactsController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'title' => 'required|unique:contacts,title',
-            'phone' => 'required|unique:contacts,phone|regex:/^0[0-9]{10}$/u',
-            'email' => 'nullable|email|unique:contacts,email'
+            'title' => 'required|unique:contacts,title,',
+            'phone' => [
+                'required_without:email',
+                'unique:contacts,phone,',
+                'regex:/^0[0-9]{10}$/u'
+            ],
+            'email' => 'required_without:phone|email|unique:contacts,email,',
         ]);
         // TODO
         // Don't use factory in controllers

@@ -46,7 +46,6 @@ class contactTest extends TestCase
         $this->getJson(route('contact.show', 999))
             ->assertNotFound();
     }
-
     public function test_store_contact_with_all_attributes(): void
     {
         $local_cont = Contact::factory()->make([
@@ -66,7 +65,7 @@ class contactTest extends TestCase
     {
         $this->postJson(route('contact.store'))
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['phone','title'])
+            ->assertJsonValidationErrors(['phone','title','email'])
             ->json();
         $this->assertEquals(1,DB::table('Contacts')->count());
 
@@ -109,8 +108,38 @@ class contactTest extends TestCase
         ])->assertUnprocessable()
             ->assertJsonValidationErrors(['email']);
     }
+    public function test_store_contact_with_phone_without_email():void
+    {
+        $response = $this->postJson(route('contact.store'),[
+            'title'=>'fake title',
+            'phone'=>'01024068783'
+        ])->assertCreated();
+
+        $this->assertEquals('01024068783', $response['phone']);
+        $this->assertDatabaseHas('Contacts',['phone'=>'01024068783']);
 
 
+    }
+    public function test_store_contact_with_email_without_phone():void
+    {
+        $response = $this->postJson(route('contact.store'),[
+            'title'=>'fake title',
+            'email'=>'moh@yahoo.com'
+        ])->assertCreated();
+
+        $this->assertEquals('moh@yahoo.com', $response['email']);
+        $this->assertDatabaseHas('Contacts',['email'=>'moh@yahoo.com']);
+
+
+    }
+    public function test_store_contact_without_email_and_without_phone():void
+    {
+        $response = $this->postJson(route('contact.store'),[
+            'title'=>'fake title',
+        ])->assertUnprocessable();
+
+        $this->assertDatabaseMissing('Contacts',['phone'=>'01024068783']);
+    }
     public function test_update_contact(): void
     {
         $response = $this->patchJson(route('contact.update',$this->createdContact->id),[
@@ -148,7 +177,7 @@ class contactTest extends TestCase
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['email']);
     }
-    public function testUpdateNonExistentContact(): void
+    public function test_update_non_existent_contact(): void
     {
         $this->patchJson(route('contact.update', 999), ['title' => 'new title'])
             ->assertNotFound();
