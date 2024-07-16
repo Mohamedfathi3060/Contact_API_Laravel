@@ -17,9 +17,7 @@ class contactFactory extends Factory
     public function definition(): array
     {
         return [
-            'title'=>$this->faker->title,
-            'phone'=>$this->faker->phoneNumber,
-            'email'=>$this->faker->email,
+            'title'=>$this->faker->sentence,
         ];
     }
 }

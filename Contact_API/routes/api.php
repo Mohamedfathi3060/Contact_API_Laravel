@@ -1,18 +1,10 @@
 <?php
 
 use App\Http\Controllers\ContactsController;
+use App\Http\Controllers\EmailsController;
+use App\Http\Controllers\PhonesController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-/*
-|--------------------------------------------------------------------------
-| API Routes
-|--------------------------------------------------------------------------
-|
-| Here is where you can register API routes for your application. These
-| routes are loaded by the RouteServiceProvider and all of them will
-| be assigned to the "api" middleware group. Make something great!
-|
-*/
 
 //Route::get('/contact',[ContactsController::class,'index'])->name('contact.index');
 //Route::get('/contact/{contact}',[ContactsController::class,'show'])->name('contact.show');
@@ -22,6 +14,24 @@ use Illuminate\Support\Facades\Route;
 
 // TODO use apiResource instead
 Route::apiResource('/contact',ContactsController::class);
+// Shallow to remove contact ID in update / delete
+Route::apiResource('/contact.email', EmailsController::class)
+    ->except('show')
+    ->shallow();
+Route::apiResource('/contact.phone', PhonesController::class)->shallow();
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();

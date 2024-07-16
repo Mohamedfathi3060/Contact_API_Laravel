@@ -24,111 +24,191 @@ class contactTest extends TestCase
         // perform
         // assert
         $response = $this->getJson(route('contact.index'))
-            ->assertOk();
-        $this->assertEquals($nconatct , count($response->json()));
-        $this->assertEquals($this->createdContact->phone,$response[0]['phone']);
+            ->assertOk()
+            ->json();
 
+        $this->assertEquals($nconatct , count($response['data']));
+        $this->assertEquals($this->createdContact->title,$response['data'][0]['title']);
     }
     public function test_fetch_one_contact(): void
     {
-        $local_generated_contact = $this->createContact();
-        // prepare
-        // perform
-        // assert
+        $local_generated_contact = $this->createContact(['title'=>'dummy title']);
+
         $response = $this->getJson(route('contact.show',$this->createdContact->id))
             ->assertOk()->json();
-//        $this->assertCount(1, $response);
-        $this->assertEquals($this->createdContact->phone, $response['phone']);
-
+        $this->assertCount(1, $response);
+        $this->assertEquals($this->createdContact->title,$response['data']['title']);
     }
     public function test_fetch_non_existent_contact(): void
     {
         $this->getJson(route('contact.show', 999))
             ->assertNotFound();
     }
+
+
     public function test_store_contact_with_all_attributes(): void
     {
-        $local_cont = Contact::factory()->make([
-            'title'=>'my test title',
-            'phone'=>'01024068783',
+
+        $response =  $this->postJson(route('contact.store'),[
+            'title'=> 'contact Test Title',
+            'phones'=>[
+                '01024068783',
+                '01069345895'
+            ],
+            'emails'=>[
+                'my@gmail.com',
+                'he@yahoo.com',
+            ]
+        ])->assertCreated()->json();
+        $response = $response['data'];
+        //$this->assertEquals($local_cont->id, $response['id']);
+        $this->assertEquals('contact Test Title', $response['title']);
+
+        $this->assertDatabaseHas('Contacts',['title'=>'contact Test Title']);
+
+        // email
+        $this->assertEquals('my@gmail.com', $response['emails'][0]['email']);
+        $this->assertEquals('he@yahoo.com', $response['emails'][1]['email']);
+        $this->assertDatabaseHas('Contacts',['title'=>'contact Test Title']);
+        $this->assertDatabaseHas('emails',[
+            'contact_id'=>$response['id'],
             'email'=>'my@gmail.com'
         ]);
-        $response =  $this->postJson(route('contact.store'),[
-            'title'=>$local_cont->title,
-            'email'=>$local_cont->email,
-            'phone'=>$local_cont->phone,
-        ])->assertCreated()->json();
-        $this->assertEquals($local_cont->phone, $response['phone']);
-        $this->assertDatabaseHas('Contacts',['phone'=>$local_cont->phone]);
+        $this->assertDatabaseHas('emails',[
+            'contact_id'=>$response['id'],
+            'email'=>'he@yahoo.com'
+        ]);
+
+        // phone
+        $this->assertEquals('01024068783', $response['phones'][0]['phone']);
+        $this->assertEquals('01069345895', $response['phones'][1]['phone']);
+        $this->assertDatabaseHas('Contacts',['title'=>'contact Test Title']);
+        $this->assertDatabaseHas('phones',[
+            'contact_id'=>$response['id'],
+            'phone'=>'01024068783'
+        ]);
+        $this->assertDatabaseHas('phones',[
+            'contact_id'=>$response['id'],
+            'phone'=>'01069345895'
+        ]);
     }
     public function test_store_contact_with_missing_body(): void
     {
-        $this->postJson(route('contact.store'))
+        $response = $this->postJson(route('contact.store'))
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['phone','title','email'])
+            ->assertJsonValidationErrors(['phones','title','emails'])
             ->json();
+//        dd($response);
         $this->assertEquals(1,DB::table('Contacts')->count());
 
     }
     public function test_store_contact_With_invalid_phone(): void
     {
         $this->postJson(route('contact.store'), [
-            'title'=>'my test title',
-            'phone'=>'invalid',
-            'email'=>'my@gmail.com'
+            'title'=> 'contact Test Title',
+            'phones'=>[
+                'invalid',
+            ],
+            'emails'=>[
+            ]
         ])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['phone']);
+            ->assertJsonValidationErrors(['phones.0']);
     }
     public function test_store_contact_With_invalid_email(): void
     {
+        // TODO
+        //  ASK if one valid and one invalid
         $this->postJson(route('contact.store'), [
-            'title'=>'my test title',
-            'phone'=>'01024068783',
-            'email'=>'my'
+            'title'=> 'contact Test Title',
+            'phones'=>[
+                '01024068783'
+            ],
+            'emails'=>[
+                'mygmail',
+            ]
         ])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['email']);
+            ->assertJsonValidationErrors(['emails.0']);
     }
     public function test_store_contact_With_duplicatePhone(): void
     {
-        $this->postJson(route('contact.store'), [
-            'title' => 'Test',
-            'phone' => $this->createdContact->phone,
-            'email' => 'test@example.com',
+
+        $response = $this->postJson(route('contact.store'), [
+            'title'=> 'contact Test Title',
+            'phones'=>[
+                '01024068783',
+                '01024068783'
+            ],
+            'emails'=>[
+            ]
         ])->assertUnprocessable()
-            ->assertJsonValidationErrors(['phone']);
+            ->assertJsonValidationErrors(['phones.1']);
     }
     public function test_store_contact_With_duplicateEmail(): void
     {
         $this->postJson(route('contact.store'), [
-            'title' => 'Test',
-            'phone' => '123456789',
-            'email' => $this->createdContact->email,
+            'title'=> 'contact Test Title',
+            'phones'=>[
+                '01024068783',
+                '01069345895'
+            ],
+            'emails'=>[
+                'my@gmail.com',
+                'my@gmail.com',
+            ]
         ])->assertUnprocessable()
-            ->assertJsonValidationErrors(['email']);
+            ->assertJsonValidationErrors(['emails.0','emails.1']);
     }
     public function test_store_contact_with_phone_without_email():void
     {
         $response = $this->postJson(route('contact.store'),[
-            'title'=>'fake title',
+            'title'=> 'contact Test Title',
+            'phones'=>[
+                '01024068783',
+                '01069345895'
+            ],
+            'emails'=>[
+            ]
+        ])->assertCreated()->json();
+        $response = $response['data'];
+        $this->assertEquals('01024068783', $response['phones'][0]['phone']);
+        $this->assertEquals('01069345895', $response['phones'][1]['phone']);
+        $this->assertDatabaseHas('Contacts',['title'=>'contact Test Title']);
+        $this->assertDatabaseHas('phones',[
+            'contact_id'=>$response['id'],
             'phone'=>'01024068783'
-        ])->assertCreated();
-
-        $this->assertEquals('01024068783', $response['phone']);
-        $this->assertDatabaseHas('Contacts',['phone'=>'01024068783']);
+        ]);
+        $this->assertDatabaseHas('phones',[
+            'contact_id'=>$response['id'],
+            'phone'=>'01069345895'
+        ]);
 
 
     }
     public function test_store_contact_with_email_without_phone():void
     {
         $response = $this->postJson(route('contact.store'),[
-            'title'=>'fake title',
-            'email'=>'moh@yahoo.com'
-        ])->assertCreated();
-
-        $this->assertEquals('moh@yahoo.com', $response['email']);
-        $this->assertDatabaseHas('Contacts',['email'=>'moh@yahoo.com']);
+            'title'=> 'contact Test Title',
+            'phones'=>[
+            ],
+            'emails'=>[
+                'my@email.com',
+                'he@yahoo.com'
+            ]
+        ])->assertCreated()->json();
+        $response = $response['data'];
+        $this->assertEquals('my@email.com', $response['emails'][0]['email']);
+        $this->assertEquals('he@yahoo.com', $response['emails'][1]['email']);
+        $this->assertDatabaseHas('Contacts',['title'=>'contact Test Title']);
+        $this->assertDatabaseHas('emails',[
+            'contact_id'=>$response['id'],
+            'email'=>'my@email.com'
+        ]);
+        $this->assertDatabaseHas('emails',[
+            'contact_id'=>$response['id'],
+            'email'=>'he@yahoo.com'
+        ]);
 
 
     }
@@ -138,14 +218,17 @@ class contactTest extends TestCase
             'title'=>'fake title',
         ])->assertUnprocessable();
 
-        $this->assertDatabaseMissing('Contacts',['phone'=>'01024068783']);
+        $this->assertDatabaseMissing('Contacts',['title'=>'fake title']);
     }
+
+
     public function test_update_contact(): void
     {
         $response = $this->patchJson(route('contact.update',$this->createdContact->id),[
             'title'=>'my new updated Title'
         ]);
-        $response->assertOk();
+        $response->assertOk()->json();
+        $response = $response['data'];
         $this->assertEquals($response['title'],'my new updated Title');
         //dd($response->json());
         //$this->assertEquals($response['title'=>'my new updated Title'])
@@ -155,40 +238,42 @@ class contactTest extends TestCase
 
 
     }
-    public function test_update_contact_with_invalid_phone(): void
-    {
-        $response = $this->patchJson(route('contact.update', $this->createdContact->id),
-            [
-                'title'=>'my test title',
-                'phone'=>'invalid',
-                'email'=>'my@gmail.com'
-            ])
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors(['phone']);
-    }
-    public function test_update_contact_with_invalid_email(): void
-    {
-        $response = $this->patchJson(route('contact.update', $this->createdContact->id),
-            [
-                'title'=>'my test title',
-                'phone'=>'01024068783',
-                'email'=>'my@'
-            ])
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors(['email']);
-    }
     public function test_update_non_existent_contact(): void
     {
         $this->patchJson(route('contact.update', 999), ['title' => 'new title'])
             ->assertNotFound();
     }
 
+//    public function test_update_contact_with_invalid_phone(): void
+//    {
+//        $response = $this->patchJson(route('contact.update', $this->createdContact->id),
+//            [
+//                'title'=>'my test title',
+//                'phone'=>'invalid',
+//                'email'=>'my@gmail.com'
+//            ])
+//            ->assertUnprocessable()
+//            ->assertJsonValidationErrors(['phone']);
+//    }
+//    public function test_update_contact_with_invalid_email(): void
+//    {
+//        $response = $this->patchJson(route('contact.update', $this->createdContact->id),
+//            [
+//                'title'=>'my test title',
+//                'phone'=>'01024068783',
+//                'email'=>'my@'
+//            ])
+//            ->assertUnprocessable()
+//            ->assertJsonValidationErrors(['email']);
+//    }
+
+
     public function test_delete_contact(): void
     {
         // we already has a record in DB in setUp function
         $response = $this->deleteJson(route('contact.destroy',$this->createdContact->id));
         $response->assertNoContent();
-        $this->assertDatabaseMissing('Contacts',['phone'=>$this->createdContact->phone]);
+        $this->assertDatabaseMissing('Contacts',['title'=>$this->createdContact->title]);
 
     }
     public function test_delete_non_existent_contact(): void

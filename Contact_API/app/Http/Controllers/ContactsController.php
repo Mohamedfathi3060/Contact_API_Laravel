@@ -2,7 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\contactRequest;
+use App\Http\Resources\ContactResource;
 use App\Models\Contact;
+use App\Models\Email;
+use App\Models\Phone;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -17,50 +21,61 @@ class ContactsController extends Controller
         // you should use eager loading by
         // 1) make the relation in model File
         // 2) query using 'MODEL_NAME::with('relationName')->get();'
-        return response(Contact::all(),Response::HTTP_OK);
+        $data = Contact::with('phones','emails')->get();
+        return ContactResource::collection($data)->response()->setStatusCode(Response::HTTP_OK);
     }
     public function show(Contact $contact)
     {
-        return response($contact,Response::HTTP_OK);
+        $contact->load(['emails', 'phones']);
+        return (new ContactResource($contact))->response()->setStatusCode(Response::HTTP_OK);
     }
-    public function store(Request $request)
+    public function store(contactRequest $request)
     {
-        $request->validate([
-            'title' => 'required|unique:contacts,title,',
-            'phone' => [
-                'required_without:email',
-                'unique:contacts,phone,',
-                'regex:/^0[0-9]{10}$/u'
-            ],
-            'email' => 'required_without:phone|email|unique:contacts,email,',
-        ]);
-        // TODO
-        // Don't use factory in controllers
-        // only in Tests
-        $newCont = Contact::create($request->all());
-        return response($newCont,Response::HTTP_CREATED);
-    }
-    public function update(Request $request,Contact $contact)
-    {
-        // TODO nullable vs sometimes
-        //  to allow phone without email
-        //      or
-        //  to allow email without phone
-        $request->validate([
-            'title' => 'sometimes|unique:contacts,title,' . $contact->id,
-            'phone' => [
-                'sometimes',
-                'unique:contacts,phone,' . $contact->id,
-                'regex:/^0[0-9]{10}$/u'
-            ],
-            'email' => 'sometimes|email|unique:contacts,email,' . $contact->id
-        ]);
-        $contact->update($request->all());
-        return response($contact,Response::HTTP_OK);
+        // create the contact it self
+        $newCont = Contact::create(['title'=>$request->title]);
 
+        if($request->has('emails')){
+            // for each email create email
+            foreach ($request->emails as $email ){
+                Email::create([
+                    'contact_id'=>$newCont->id,
+                    'email'=>$email
+                ]);
+            }
+        }
+        if($request->has('phones')){
+            foreach ($request->phones as $phone ){
+                Phone::create([
+                    'contact_id'=>$newCont->id,
+                    'phone'=>$phone
+                ]);
+            }
+        }
+        // USED to join with it's emails and phones
+        $newCont->load(['emails', 'phones']);
+        return (new ContactResource($newCont))->response()->setStatusCode(Response::HTTP_CREATED);
+    }
+    public function update(contactRequest $request,Contact $contact)
+    {
+        $contact->update(['title'=>$request->title]);
+        return (new ContactResource($contact))->response()->setStatusCode(Response::HTTP_OK);
     }
     public function destroy(Contact $contact){
         $contact->delete();
-        return response('',Response::HTTP_NO_CONTENT);
+        return response()->noContent();
     }
 }
+
+
+
+
+
+
+// Load vs with
+/*
+ * both is used for eager loading
+ * But with used in query building process
+ * while load used after retrieved the model collections
+ *  */
+// TODO
+//  USE request "validation" and resource
